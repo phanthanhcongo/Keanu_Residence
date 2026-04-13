@@ -1,0 +1,34 @@
+### Test đăng ký và nhận OTP
+POST http://localhost:4000/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "password123",
+  "confirmPassword": "password123"
+}
+
+### Test resend OTP
+POST http://localhost:4000/auth/resend-otp
+Content-Type: application/json
+
+{
+  "email": "test@example.com"
+}
+
+### Test verify OTP
+POST http://localhost:4000/auth/verify-otp
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "code": "123456"
+}
+
+### Test resend OTP khi OTP còn hiệu lực (sẽ bị từ chối)
+POST http://localhost:4000/auth/resend-otp
+Content-Type: application/json
+
+{
+  "email": "test@example.com"
+}

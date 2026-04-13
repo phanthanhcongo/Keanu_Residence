@@ -1,0 +1,47 @@
+export const ERROR_CODES = {
+  // Authentication Errors
+  UNAUTHORIZED: { code: 'UNAUTHORIZED', status: 401 },
+  INVALID_CREDENTIALS: { code: 'INVALID_CREDENTIALS', status: 401 },
+  OTP_EXPIRED: { code: 'OTP_EXPIRED', status: 401 },
+  OTP_INVALID: { code: 'OTP_INVALID', status: 401 },
+  OTP_ALREADY_SENT: { code: 'OTP_ALREADY_SENT', status: 429 },
+  OTP_RATE_LIMIT_EXCEEDED: { code: 'OTP_RATE_LIMIT_EXCEEDED', status: 429 },
+  OTP_ATTEMPTS_EXCEEDED: { code: 'OTP_ATTEMPTS_EXCEEDED', status: 401 },
+  TOKEN_EXPIRED: { code: 'TOKEN_EXPIRED', status: 401 },
+
+  // User/Account Errors
+  USER_NOT_FOUND: { code: 'USER_NOT_FOUND', status: 404 },
+  EMAIL_ALREADY_EXISTS: { code: 'EMAIL_ALREADY_EXISTS', status: 409 },
+  PHONE_ALREADY_EXISTS: { code: 'PHONE_ALREADY_EXISTS', status: 409 },
+  EMAIL_NOT_FOUND: { code: 'EMAIL_NOT_FOUND', status: 404 },
+  ACCOUNT_ALREADY_VERIFIED: { code: 'ACCOUNT_ALREADY_VERIFIED', status: 400 },
+  ACCOUNT_NOT_VERIFIED: { code: 'ACCOUNT_NOT_VERIFIED', status: 403 },
+  ACCOUNT_LOCKED: { code: 'ACCOUNT_LOCKED', status: 403 },
+  PASSWORD_MISMATCH: { code: 'PASSWORD_MISMATCH', status: 400 },
+  PROFILE_INCOMPLETE: { code: 'PROFILE_INCOMPLETE', status: 400 },
+
+  // Validation Errors
+  VALIDATION_ERROR: { code: 'VALIDATION_ERROR', status: 400 },
+  INVALID_JSON_FORMAT: { code: 'INVALID_JSON_FORMAT', status: 400 },
+  REQUIRED_FIELD_MISSING: { code: 'REQUIRED_FIELD_MISSING', status: 400 },
+
+  // Business Logic Errors
+  UNIT_ALREADY_LOCKED: { code: 'UNIT_ALREADY_LOCKED', status: 409 },
+  UNIT_NOT_AVAILABLE: { code: 'UNIT_NOT_AVAILABLE', status: 409 },
+  RESERVATION_EXPIRED: { code: 'RESERVATION_EXPIRED', status: 410 },
+  RESERVATION_NOT_FOUND: { code: 'RESERVATION_NOT_FOUND', status: 404 },
+  PAYMENT_FAILED: { code: 'PAYMENT_FAILED', status: 402 },
+  INSUFFICIENT_FUNDS: { code: 'INSUFFICIENT_FUNDS', status: 402 },
+  RESERVATION_ALREADY_EXISTS: { code: 'RESERVATION_ALREADY_EXISTS', status: 409 },
+  PENDING_RESERVATION_EXISTS: { code: 'PENDING_RESERVATION_EXISTS', status: 409 },
+
+    // Email/SMTP Errors
+    EMAIL_SEND_FAILED: { code: 'EMAIL_SEND_FAILED', status: 500 },
+    SMS_SEND_FAILED: { code: 'SMS_SEND_FAILED', status: 500 },
+
+  // Server Errors
+  INTERNAL_SERVER_ERROR: { code: 'INTERNAL_SERVER_ERROR', status: 500 },
+  DATABASE_ERROR: { code: 'DATABASE_ERROR', status: 500 },
+  PAYMENT_GATEWAY_ERROR: { code: 'PAYMENT_GATEWAY_ERROR', status: 502 },
+  EXTERNAL_SERVICE_ERROR: { code: 'EXTERNAL_SERVICE_ERROR', status: 502 },
+} as const;

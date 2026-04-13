@@ -1,0 +1,160 @@
+version: '3.8'
+
+services:
+  # Backend NestJS
+  keanu-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: keanu-backend
+    ports:
+      - '4000:4000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      mailhog:
+        condition: service_started
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - DOCKER_ENV=true
+
+      # --- Database (from env vars) ---
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL must be set for production}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:?DB_USER must be set for production}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD must be set for production}
+      - DB_NAME=${DB_NAME:?DB_NAME must be set for production}
+
+      # --- Redis ---
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+      # --- JWT ---
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN:-15m}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN:-7d}
+
+      # --- OTP ---
+      - OTP_EXPIRY=${OTP_EXPIRY:-600000}
+      - OTP_MAX_ATTEMPTS=${OTP_MAX_ATTEMPTS:-3}
+
+      # --- Payment ---
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - PAYSTACK_SECRET_KEY=${PAYSTACK_SECRET_KEY}
+
+      # --- Email ---
+      - SMTP_HOST=${SMTP_HOST:-mailhog}
+      - SMTP_PORT=${SMTP_PORT:-1025}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+
+      # --- GHL Integration ---
+      - GHL_CLIENT_ID=${GHL_CLIENT_ID}
+      - GHL_CLIENT_SECRET=${GHL_CLIENT_SECRET}
+      - GHL_REDIRECT_URI=${GHL_REDIRECT_URI}
+      - APP_URL=${APP_URL}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - GHL_EMAIL_WEBHOOK_URL=${GHL_EMAIL_WEBHOOK_URL}
+      - GHL_EMAIL_ENABLED=${GHL_EMAIL_ENABLED:-true}
+
+      # --- Consultant ---
+      - CONSULTANT_CALENDAR_LINK=${CONSULTANT_CALENDAR_LINK:-https://connect.nyalavillas.com/calendar}
+      - CONSULTANT_NAME=${CONSULTANT_NAME:-Nyala Team}
+
+      # --- Cloudinary ---
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+
+      # --- Prisma ---
+      - PRISMA_CLIENT_ENGINE_TYPE=binary
+
+    restart: always
+    networks:
+      - keanu-network
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: keanu-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:?DB_USER must be set for production}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set for production}
+      POSTGRES_DB: ${DB_NAME:?DB_NAME must be set for production}
+      POSTGRES_INITDB_ARGS: '--auth-host=md5 --auth-local=trust'
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - keanu-network
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${DB_USER:?DB_USER must be set for production}',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: keanu-redis
+    restart: always
+    ports:
+      - '6380:6379'
+    volumes:
+      - redisdata:/data
+    networks:
+      - keanu-network
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MailHog - Email testing server
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: keanu-mailhog
+    ports:
+      - '1025:1025' # SMTP server
+      - '8025:8025' # Web UI
+    restart: always
+    networks:
+      - keanu-network
+
+  # Stripe CLI - Webhook listener (optional)
+  stripe-listen:
+    image: stripe/stripe-cli:latest
+    container_name: keanu-stripe-listen
+    depends_on:
+      keanu-backend:
+        condition: service_started
+    command: listen --forward-to http://keanu-backend:4000/webhook --api-key ${STRIPE_SECRET_KEY}
+    restart: unless-stopped
+    networks:
+      - keanu-network
+    profiles:
+      - stripe
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  keanu-network:
+    driver: bridge

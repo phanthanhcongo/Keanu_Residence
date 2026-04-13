@@ -1,0 +1,359 @@
+# keanu Backend GitLab CI/CD Pipeline
+# NestJS application with Docker Compose deployment via SSH
+# Dev: 183.91.11.149 | Staging: 103.164.35.132
+
+stages:
+  - test
+  - deploy-dev
+  - deploy-staging
+  - teardown
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: '/certs'
+  # Image names (using GitLab Container Registry)
+  BACKEND_IMAGE: $CI_REGISTRY_IMAGE/keanu-backend
+  # Default branch for production deployments
+  PRODUCTION_BRANCH: main
+  # Server IPs
+  DEV_SERVER_IP: 183.91.11.149
+  STAGING_SERVER_IP: 183.91.11.149
+  # Deployment path on servers
+  DEPLOY_PATH: /opt/keanu/be
+
+# ============================================
+# BUILD STAGE (Disabled - Building on Server)
+# ============================================
+# .build_template: &build_template
+#   stage: build
+#   image: docker:24
+#   services:
+#     - docker:24-dind
+#   before_script:
+#     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+#   tags:
+#     - docker
+#
+# build-auth-service:
+#   <<: *build_template
+#   script:
+#     - docker build -t $AUTH_IMAGE:$CI_COMMIT_SHA -t $AUTH_IMAGE:latest -f services/auth-service/Dockerfile .
+#     - docker push $AUTH_IMAGE:$CI_COMMIT_SHA
+#     - docker push $AUTH_IMAGE:latest
+#   rules:
+#     - changes:
+#         - services/auth-service/**/*
+#         - shared/**/*
+#         - proto/**/*
+#     - if: '$CI_PIPELINE_SOURCE == "web"'
+#
+# build-member-service:
+#   <<: *build_template
+#   script:
+#     - docker build -t $MEMBER_IMAGE:$CI_COMMIT_SHA -t $MEMBER_IMAGE:latest -f services/member-service/Dockerfile .
+#     - docker push $MEMBER_IMAGE:$CI_COMMIT_SHA
+#     - docker push $MEMBER_IMAGE:latest
+#   rules:
+#     - changes:
+#         - services/member-service/**/*
+#         - shared/**/*
+#         - proto/**/*
+#     - if: '$CI_PIPELINE_SOURCE == "web"'
+
+# ============================================
+# TEST STAGE
+# ============================================
+# test-backend:
+#   stage: test
+#   image: node:20-slim
+#   before_script:
+#     - npm ci
+#     - npx prisma generate
+#   script:
+#     - npm run test:cov
+#   coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+#   artifacts:
+#     reports:
+#       coverage_report:
+#         coverage_format: cobertura
+#         path: coverage/cobertura-coverage.xml
+#     paths:
+#       - coverage/
+#     expire_in: 30 days
+#   tags:
+#     - docker
+#   rules:
+#     - changes:
+#         - src/**/*
+#         - test/**/*
+#         - prisma/**/*
+#         - package*.json
+#     - if: '$CI_PIPELINE_SOURCE == "web"'
+#     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
+
+# ============================================
+# DEPLOY TO DEV STAGE
+# ============================================
+.deploy_template: &deploy_template
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client rsync bash
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | base64 -d | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\tUserKnownHostsFile=/dev/null" > ~/.ssh/config
+  tags:
+    - docker
+
+# deploy-dev:
+#   <<: *deploy_template
+#   stage: deploy-dev
+#   environment:
+#     name: development
+#     url: http://$DEV_SERVER_IP:4000
+#     on_stop: teardown-dev
+#   script:
+#     - |
+#       # Create deployment directory if it doesn't exist
+#       ssh root@$DEV_SERVER_IP "mkdir -p $DEPLOY_PATH"
+#
+#       # Sync source code to server (excluding node_modules and other build artifacts)
+#       rsync -avz --delete \
+#         --exclude 'node_modules' \
+#         --exclude 'dist' \
+#         --exclude '.git' \
+#         --exclude 'coverage' \
+#         --exclude '.env' \
+#         . root@$DEV_SERVER_IP:$DEPLOY_PATH/
+
+#       # Create .env file and deploy
+#       ssh root@$DEV_SERVER_IP bash -s <<REMOTE_SCRIPT
+#         set -e
+#         cd $DEPLOY_PATH
+
+#         echo "📂 Current directory: $(pwd)"
+#         echo "📋 Verifying required files..."
+#         ls -la | head -20
+#         if [ ! -f Dockerfile ]; then
+#           echo "❌ ERROR: Dockerfile not found in $DEPLOY_PATH"
+#           echo "📁 Directory contents:"
+#           ls -la
+#           exit 1
+#         fi
+#         echo "✅ Dockerfile found"
+#
+#         echo "📦 Building keanu Backend..."
+#         docker build -t keanu-backend:latest -f Dockerfile .
+
+#         echo "🔧 Setting up environment variables..."
+#         cat <<-ENVFILE > .env.tmp
+#         PORT=4000
+#         NODE_ENV=production
+#         DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?schema=public
+#         REDIS_URL=redis://redis:6379
+#         JWT_SECRET=${JWT_SECRET}
+#         JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+#         JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+#         JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN:-15m}
+#         JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+#         JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN:-7d}
+#         OTP_EXPIRY=${OTP_EXPIRY:-600000}
+#         OTP_MAX_ATTEMPTS=${OTP_MAX_ATTEMPTS:-3}
+#         STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+#         PAYSTACK_SECRET_KEY=${PAYSTACK_SECRET_KEY}
+#         SMTP_HOST=${SMTP_HOST:-mailhog}
+#         SMTP_PORT=${SMTP_PORT:-1025}
+#         SMTP_USER=${SMTP_USER}
+#         SMTP_PASS=${SMTP_PASS}
+#         MINIO_ENDPOINT=minio
+#         MINIO_PORT=9000
+#         MINIO_USE_SSL=false
+#         MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+#         MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin123}
+#         MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL}
+#         GHL_CLIENT_ID=${GHL_CLIENT_ID}
+#         GHL_CLIENT_SECRET=${GHL_CLIENT_SECRET}
+#         GHL_REDIRECT_URI=${GHL_REDIRECT_URI}
+#         APP_URL=${APP_URL}
+#         FRONTEND_URL=${FRONTEND_URL}
+#         ENCRYPTION_KEY=${ENCRYPTION_KEY}
+#         GHL_EMAIL_WEBHOOK_URL=${GHL_EMAIL_WEBHOOK_URL}
+#         GHL_EMAIL_ENABLED=${GHL_EMAIL_ENABLED:-true}
+#         PRISMA_CLIENT_ENGINE_TYPE=binary
+#         ENVFILE
+#         sed -e 's/^        //' -e '/^ENVFILE$/d' .env.tmp > .env
+#         rm .env.tmp
+
+#         echo "🚀 Starting services with Docker Compose..."
+#         docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+#         echo "⏳ Waiting for services to be healthy..."
+#         sleep 15
+
+#         echo "🏥 Health check..."
+#         curl -f http://localhost:4000/api || echo "⚠️ Health check failed"
+
+#         echo "📊 Container status:"
+#         docker ps | grep keanu
+
+#         echo "✅ Deployment to DEV complete!"
+#       REMOTE_SCRIPT
+#   when: manual
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
+
+# ============================================
+# DEPLOY TO STAGING STAGE
+# ============================================
+deploy-staging:
+  <<: *deploy_template
+  stage: deploy-staging
+  environment:
+    name: staging
+    url: http://$STAGING_SERVER_IP:4000
+    on_stop: teardown-staging
+  script:
+    - |
+      # Create deployment directory if it doesn't exist
+      ssh root@$STAGING_SERVER_IP "mkdir -p $DEPLOY_PATH"
+
+      # Sync source code to server (excluding node_modules and other build artifacts)
+      rsync -avz --delete \
+        --exclude 'node_modules' \
+        --exclude 'dist' \
+        --exclude '.git' \
+        --exclude 'coverage' \
+        --exclude '.env' \
+        . root@$STAGING_SERVER_IP:$DEPLOY_PATH/
+
+      # Create .env file and deploy
+      ssh root@$STAGING_SERVER_IP bash -s <<REMOTE_SCRIPT
+        set -e
+        cd $DEPLOY_PATH
+
+        if [ ! -f Dockerfile ]; then
+          echo "❌ ERROR: Dockerfile not found in $DEPLOY_PATH"
+          ls -la
+          exit 1
+        fi
+
+        # Enable BuildKit for layer caching and parallel stage builds
+        export DOCKER_BUILDKIT=1
+        export COMPOSE_DOCKER_CLI_BUILD=1
+
+        echo "🔧 Setting up environment variables..."
+        printf '%s\n' \
+          "PORT=4000" \
+          "NODE_ENV=production" \
+          "DB_USER=${DB_USER:-postgres}" \
+          "DB_PASSWORD=${DB_PASSWORD:-changeme}" \
+          "DB_NAME=${DB_NAME:-keanu_db}" \
+          "DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-keanu_db}?schema=public" \
+          "REDIS_URL=redis://redis:6379" \
+          "JWT_SECRET=${JWT_SECRET}" \
+          "JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}" \
+          "JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}" \
+          "JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN:-15m}" \
+          "JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}" \
+          "JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN:-7d}" \
+          "OTP_EXPIRY=${OTP_EXPIRY:-600000}" \
+          "OTP_MAX_ATTEMPTS=${OTP_MAX_ATTEMPTS:-3}" \
+          "STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}" \
+          "PAYSTACK_SECRET_KEY=${PAYSTACK_SECRET_KEY}" \
+          "SMTP_HOST=${SMTP_HOST:-mailhog}" \
+          "SMTP_PORT=${SMTP_PORT:-1025}" \
+          "SMTP_USER=${SMTP_USER}" \
+          "SMTP_PASS=${SMTP_PASS}" \
+          "MINIO_ENDPOINT=minio" \
+          "MINIO_PORT=9000" \
+          "MINIO_USE_SSL=false" \
+          "MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}" \
+          "MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin123}" \
+          "MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL}" \
+          "GHL_CLIENT_ID=${GHL_CLIENT_ID}" \
+          "GHL_CLIENT_SECRET=${GHL_CLIENT_SECRET}" \
+          "GHL_REDIRECT_URI=${GHL_REDIRECT_URI}" \
+          "APP_URL=${APP_URL}" \
+          "FRONTEND_URL=${FRONTEND_URL}" \
+          "ENCRYPTION_KEY=${ENCRYPTION_KEY}" \
+          "GHL_EMAIL_WEBHOOK_URL=${GHL_EMAIL_WEBHOOK_URL}" \
+          "GHL_EMAIL_ENABLED=${GHL_EMAIL_ENABLED:-true}" \
+          "STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}" \
+          "SMTP_FROM=${SMTP_FROM}" \
+          "CONSULTANT_CALENDAR_LINK=${CONSULTANT_CALENDAR_LINK}" \
+          "CONSULTANT_NAME=${CONSULTANT_NAME}" \
+          "CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}" \
+          "CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}" \
+          "CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}" \
+          "PRISMA_CLIENT_ENGINE_TYPE=binary" > .env
+
+        echo "📦 Building keanu Backend with Docker Compose (BuildKit cache)..."
+        docker compose -f docker-compose.prod.yml build
+
+        echo "🚀 Starting services with Docker Compose..."
+        docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+        echo "⏳ Waiting for backend to be healthy (up to 120s)..."
+        RETRIES=40
+        retry=0
+        while [ \$retry -lt \$RETRIES ]; do
+          retry=\$((retry + 1))
+          if curl -sf http://localhost:4000/api > /dev/null 2>&1; then
+            echo "✅ Backend is healthy (attempt \$retry)"
+            break
+          fi
+          if [ \$retry -eq \$RETRIES ]; then
+            echo "❌ Backend did not become healthy after 120s"
+            docker compose -f docker-compose.prod.yml logs --tail=50 keanu-backend
+            exit 1
+          fi
+          echo "Attempt \$retry/\$RETRIES - waiting 3s..."
+          sleep 3
+        done
+
+        echo "📊 Container status:"
+        docker ps | grep keanu
+
+        echo "✅ Deployment to STAGING complete!"
+      REMOTE_SCRIPT
+  when: manual
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ============================================
+# TEARDOWN STAGE
+# ============================================
+# teardown-dev:
+#   <<: *deploy_template
+#   stage: teardown
+#   environment:
+#     name: development
+#     action: stop
+#   script:
+#     - |
+#       ssh root@$DEV_SERVER_IP bash -s <<REMOTE_SCRIPT
+#         cd $DEPLOY_PATH
+#         docker compose -f docker-compose.prod.yml down --remove-orphans
+#         echo "✅ DEV environment torn down"
+#       REMOTE_SCRIPT
+#   when: manual
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
+
+teardown-staging:
+  <<: *deploy_template
+  stage: teardown
+  environment:
+    name: staging
+    action: stop
+  script:
+    - |
+      ssh root@$STAGING_SERVER_IP bash -s <<REMOTE_SCRIPT
+        cd $DEPLOY_PATH
+        docker compose -f docker-compose.prod.yml down --remove-orphans
+        echo "✅ STAGING environment torn down"
+      REMOTE_SCRIPT
+  when: manual
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'

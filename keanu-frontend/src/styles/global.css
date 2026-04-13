@@ -1,0 +1,52 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Lato:wght@300;400;700&family=Montserrat:wght@300;400;500;600&family=Inter:wght@300;400;500&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Cormorant Garamond", serif;
+  --font-sans: "Inter", sans-serif;
+  --font-display: "Montserrat", sans-serif;
+  --font-cinzel: "Cinzel", serif;
+  --font-lato: "Lato", sans-serif;
+  --font-playfair: "Playfair Display", serif;
+
+  --color-bg-primary: #F5F2EBE5;
+  --color-bg-secondary: #ebeae5;
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #5a5a5a;
+  --color-accent: #a89b8c;
+}
+
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-cinzel {
+  font-family: var(--font-cinzel);
+}
+
+.font-lato {
+  font-family: var(--font-lato);
+}
+
+.font-playfair {
+  font-family: var(--font-playfair);
+}
+
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

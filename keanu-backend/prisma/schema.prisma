@@ -1,0 +1,377 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ================================================================================
+//                                   ENUMS
+// ================================================================================
+
+enum UserRole {
+  BUYER
+  ADMIN
+  SUPER_ADMIN
+  SALES
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProjectStatus {
+  UPCOMING
+  LIVE
+  CLOSED
+}
+
+enum UnitStatus {
+  AVAILABLE
+  LOCKED
+  RESERVED
+  SOLD
+  UNAVAILABLE
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+  FAILED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+// ================================================================================
+//                                  MODELS
+// ================================================================================
+
+model User {
+  id                    String    @id @default(uuid()) @db.Uuid
+  phoneNumber           String?   @unique @db.VarChar(20)
+  email                 String?   @unique @db.VarChar(255)
+  firstName             String?   @db.VarChar(100)
+  lastName              String?   @db.VarChar(100)
+  dateOfBirth           DateTime? @db.Date
+  gender                String?   @db.VarChar(20)
+  address               String?   @db.VarChar(255)
+  city                  String?   @db.VarChar(100)
+  country               String?   @db.VarChar(100)
+  avatarUrl             String?   @db.VarChar(500)
+  password              String?   @db.VarChar(255)
+  role                  UserRole  @default(BUYER)
+  status                UserStatus @default(ACTIVE)
+  isVerified            Boolean   @default(false)
+  interest              String?   @db.VarChar(50)
+  
+  // thêm:
+  // hash của refresh token hiện tại
+  refreshTokenHash      String?
+  refreshTokenExpiresAt DateTime?
+  // GHL Contact ID
+  ghlContactId          String?   @db.VarChar(255)
+  // Profile completion skip flag
+  profileCompletionSkipped Boolean? @default(false)
+  // UTM source / referral source
+  referral              String?   @db.VarChar(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+
+  // Relations
+  emailOtps    EmailOtp[]
+  phoneOtps    PhoneOtp[]
+  shortlists   Shortlist[]
+  reservations Reservation[]
+  activityLogs ActivityLog[]
+
+  @@index([phoneNumber])
+  @@index([email])
+  @@index([isDeleted])
+  @@map("user")
+}
+
+model EmailOtp {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  code      String   @db.VarChar(6)
+  email     String   @db.VarChar(255)
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  isDeleted Boolean  @default(false)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, createdAt])
+  @@index([isDeleted])
+  @@map("email_otp")
+}
+
+model PhoneOtp {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  code        String   @db.VarChar(6)
+  phoneNumber String   @db.VarChar(20)
+  expiresAt   DateTime
+  verified    Boolean  @default(false)
+  attempts    Int      @default(0)
+  createdAt   DateTime @default(now())
+  isDeleted   Boolean  @default(false)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([phoneNumber, createdAt])
+  @@index([isDeleted])
+  @@map("phone_otp")
+}
+
+model Project {
+  id          String        @id @default(uuid()) @db.Uuid
+  name        String        @db.VarChar(255)
+  slug        String        @unique @db.VarChar(255)
+  description String?       @db.Text
+  developer   String        @db.VarChar(255)
+  location    String?       @db.VarChar(255)
+  launchDate  DateTime      @db.Date
+  launchTime  String        @db.VarChar(10) // Format: "HH:MM"
+  timezone    String        @default("UTC") @db.VarChar(50)
+  status      ProjectStatus @default(UPCOMING)
+
+  // Branding
+  logoUrl        String? @db.VarChar(500)
+  primaryColor   String? @db.VarChar(7) // Hex color
+  secondaryColor String? @db.VarChar(7)
+
+  // Media
+  heroImageUrl String? @db.VarChar(500)
+  videoUrl     String? @db.VarChar(500) // "How to Reserve" video
+
+  // Legal
+  termsUrl  String? @db.VarChar(500)
+  policyUrl String? @db.VarChar(500)
+
+  // Settings
+  reservationDuration Int     @default(10) // minutes
+  depositAmount       Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+  isPrimary Boolean  @default(false)
+
+  // Relations
+  units        Unit[]
+  reservations Reservation[]
+
+  @@index([slug])
+  @@index([launchDate])
+  @@index([isDeleted])
+  @@map("project")
+}
+
+model Unit {
+  id         String     @id @default(uuid()) @db.Uuid
+  projectId  String     @db.Uuid
+  unitNumber String     @db.VarChar(50)
+  unitType   String     @db.VarChar(50) // '1BR', '2BR', 'studio'.
+  floor      Int?
+  size       Decimal    @db.Decimal(10, 2) // sq ft or sq m
+  bedrooms   Int
+  bathrooms  Decimal    @db.Decimal(3, 1)
+  price      Decimal    @db.Decimal(12, 2)
+  launchPrice Decimal?  @db.Decimal(12, 2) // Launch/early bird price
+  status     UnitStatus @default(AVAILABLE)
+  shortlistCount Int      @default(0)
+
+  // Details
+  description  String? @db.Text
+  floorPlanUrl String? @db.VarChar(500)
+  imageUrls    Json? // Array of image URLs
+  features     Json? // Flexible features object
+
+  // Position (for visualization)
+  xPosition Int?
+  yPosition Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+
+  // Relations
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  shortlists   Shortlist[]
+  reservations Reservation[]
+
+  @@unique([projectId, unitNumber])
+  @@index([projectId, status])
+  @@index([price])
+  @@index([launchPrice])
+  @@index([unitType])
+  @@index([isDeleted])
+  @@map("unit")
+}
+
+model Shortlist {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  unitId    String   @db.Uuid
+  createdAt DateTime @default(now())
+  isDeleted Boolean  @default(false)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, unitId])
+  @@index([userId])
+  @@index([isDeleted])
+  @@map("shortlist")
+}
+
+model Reservation {
+  id        String @id @default(uuid()) @db.Uuid
+  userId    String @db.Uuid
+  unitId    String @db.Uuid
+  projectId String @db.Uuid
+
+  // Reservation Flow
+  status      ReservationStatus @default(PENDING)
+  lockedAt    DateTime          @default(now())
+  expiresAt   DateTime
+  confirmedAt DateTime?
+
+  // Payment
+  depositAmount   Decimal       @db.Decimal(10, 2)
+  paymentIntentId String?       @unique @db.VarChar(255) // Stripe/Paystack ID
+  paymentStatus   PaymentStatus @default(PENDING)
+  paymentMethod   String?       @db.VarChar(50) // 'stripe' or 'paystack'
+
+  // Contact
+  buyerName  String? @db.VarChar(255)
+  buyerEmail String? @db.VarChar(255)
+  buyerPhone String? @db.VarChar(20)
+
+  // Tracking
+  source   String? @db.VarChar(100) // UTM source
+  campaign String? @db.VarChar(100) // UTM campaign
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  unit    Unit    @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  payments Payment[]
+
+  @@index([userId])
+  @@index([unitId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([isDeleted])
+  @@map("reservation")
+}
+
+
+model Payment {
+  id              String        @id @default(uuid()) @db.Uuid
+  reservationId   String?       @db.Uuid
+  invoiceId       String        @db.VarChar(255)  // GHL Invoice ID
+  paymentId       String        @db.VarChar(255)  // GHL Payment ID
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @db.VarChar(50)
+  status          PaymentStatus @default(PENDING)
+  provider        String        @db.VarChar(100) // e.g. GHL/Stripe
+  paidAt          DateTime?
+  rawPayload      Json          // Store full webhook for audit/debug
+
+  reservation Reservation? @relation(fields: [reservationId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([invoiceId])
+  @@index([paymentId])
+  @@map("payment")
+}
+
+
+model ActivityLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  action    String   @db.VarChar(100) // 'UNIT_UPLOAD', 'PROJECT_CREATE', etc.
+  entity    String   @db.VarChar(50) // 'Unit', 'Project', 'Reservation'
+  entityId  String?  @db.Uuid // UUID
+  metadata  Json? // Additional context
+  ipAddress String?  @db.VarChar(45) // IPv4 or IPv6
+  userAgent String?  @db.Text
+  createdAt DateTime @default(now())
+  isDeleted Boolean  @default(false)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([action])
+  @@index([isDeleted])
+  @@map("activity_log")
+}
+
+model Integration {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String?   @db.Uuid // User ID (admin) who connected the integration
+  appId        String?   @db.VarChar(255) // Application/Project ID (optional, for backward compatibility)
+  providerType String    @db.VarChar(50) // 'crm', 'analytics', etc.
+  providerName String    @db.VarChar(50) // 'ghl', 'hubspot', etc.
+  status       String    @default("inactive") @db.VarChar(20) // 'active', 'inactive'
+  credentials  Json // Encrypted credentials
+  config       Json? // Additional configuration
+  lastTestedAt DateTime?
+  testResult   Json? // Last test result
+  lastError    String?   @db.Text
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  isDeleted    Boolean   @default(false)
+
+  @@unique([userId, providerName])
+  @@index([userId])
+  @@index([appId])
+  @@index([providerName])
+  @@index([status])
+  @@index([isDeleted])
+  @@map("integration")
+}
+
+model UserManipulation {
+  id        Int      @id @default(autoincrement())
+  delta     Int
+  milestone DateTime @db.Timestamp(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([milestone])
+  @@map("user_manipulation")
+}

@@ -1,0 +1,118 @@
+services:
+  # Backend NestJS
+  keanu-backend:
+    build: .
+    container_name: keanu-backend
+    ports:
+      - '0.0.0.0:4000:4000'
+    depends_on:
+      - postgres
+      - redis
+      - mailhog
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      - DOCKER_ENV=true
+
+      # --- PostgreSQL ---
+      - DATABASE_URL=postgresql://postgres:1234567@postgres:5432/keanu_db?schema=public
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=1234567
+      - DB_NAME=keanu_db
+
+      # --- Redis ---
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+      # --- Consultant ---
+      - CONSULTANT_CALENDAR_LINK=${CONSULTANT_CALENDAR_LINK:-https://connect.nyalavillas.com/calendar}
+      - CONSULTANT_NAME=${CONSULTANT_NAME:-Nyala Team}
+
+      # --- JWT ---
+      - JWT_ACCESS_EXPIRES_IN=1d
+
+    volumes:
+      - ./uploads:/app/uploads
+    restart: always
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: keanu-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234567
+      POSTGRES_DB: keanu_db
+      POSTGRES_INITDB_ARGS: '--auth-host=md5 --auth-local=trust'
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: keanu-redis
+    restart: always
+    ports:
+      - '6379:6379'
+    volumes:
+      - redisdata:/data
+
+  # MailHog - Email testing server
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    ports:
+      - '1025:1025' # SMTP server
+      - '8025:8025' # Web UI
+    restart: always
+
+  # Prisma Studio - Database GUI
+  prisma-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile.prisma-studio
+    container_name: keanu-prisma-studio
+    ports:
+      - '5555:5555' # Prisma Studio Web UI
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - DOCKER_ENV=true
+
+      # --- PostgreSQL ---
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=1234567
+      - DB_NAME=keanu_db
+      - DATABASE_URL=postgresql://postgres:1234567@postgres:5432/keanu_db?schema=public
+    volumes:
+      - ./prisma:/app/prisma
+    command: sh -c "npx prisma generate && npx prisma studio --port 5555 --browser none"
+    restart: unless-stopped
+
+  # Stripe CLI - Webhook listener (optional)
+  stripe-listen:
+    image: stripe/stripe-cli:latest
+    container_name: keanu-stripe-listen
+    depends_on:
+      keanu-backend:
+        condition: service_started
+    command: listen --forward-to http://keanu-backend:4000/webhook --api-key ${STRIPE_SECRET_KEY}
+    restart: unless-stopped
+    profiles:
+      - stripe
+
+volumes:
+  pgdata:
+  redisdata:

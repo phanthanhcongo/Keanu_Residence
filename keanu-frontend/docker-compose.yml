@@ -1,0 +1,12 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://192.168.1.45:4000/api}
+        VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY:-pk_test_51SbOvxEFK1qDUXRhsMAWktlTKbwid9E5QkVlJEUWplZrIwHOre1dHBrQnetWlcIcWhZYFdEwpkJUcU4nfU8IsPdT00RUirIU9f}
+    container_name: keanu-frontend
+    ports:
+      - "3000:80"
+    restart: always
