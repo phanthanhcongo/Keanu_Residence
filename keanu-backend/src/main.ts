@@ -42,7 +42,8 @@ async function bootstrap() {
     'http://192.168.1.33:3000/',
     'https://api.hypelaunch.pathtech.net',
     'https://keanu-frontend-rho.vercel.app',
-    'https://keanuresidence-production.up.railway.app'
+    'https://keanuresidence-production.up.railway.app',
+    'https://keanu-residence.vercel.app'
   ];
 
   const envOrigins = process.env.ALLOWED_ORIGINS
