@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.4
 # Stage 1: Build NestJS app
 FROM node:20-slim AS builder
 # Prisma requires OpenSSL - node:20-slim doesn't include it
@@ -6,8 +5,7 @@ RUN apt-get update -y && apt-get install -y openssl
 WORKDIR /app
 
 COPY package*.json ./
-RUN --mount=type=cache,id=npm,target=/root/.npm \
-    npm install
+RUN npm install
 
 COPY . .
 
@@ -29,8 +27,7 @@ COPY package*.json ./
 
 # Install production dependencies using npm ci for faster, reliable installs
 # Note: Prisma is in dependencies, so it will be installed
-RUN --mount=type=cache,id=npm,target=/root/.npm \
-    npm ci --omit=dev --legacy-peer-deps || \
+RUN npm ci --omit=dev --legacy-peer-deps || \
     npm install --production --legacy-peer-deps
 
 # Copy built application
