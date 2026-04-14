@@ -6,7 +6,7 @@ RUN apt-get update -y && apt-get install -y openssl
 WORKDIR /app
 
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,id=npm,target=/root/.npm \
     npm install
 
 COPY . .
@@ -29,7 +29,7 @@ COPY package*.json ./
 
 # Install production dependencies using npm ci for faster, reliable installs
 # Note: Prisma is in dependencies, so it will be installed
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,id=npm,target=/root/.npm \
     npm ci --omit=dev --legacy-peer-deps || \
     npm install --production --legacy-peer-deps
 
