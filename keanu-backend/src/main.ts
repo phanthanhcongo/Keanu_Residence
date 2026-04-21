@@ -43,7 +43,8 @@ async function bootstrap() {
     'https://api.hypelaunch.pathtech.net',
     'https://keanu-frontend-rho.vercel.app',
     'https://keanuresidence-production.up.railway.app',
-    'https://keanu-residence.vercel.app'
+    'https://keanu-residence.vercel.app',
+    'https://main.d2sgt20asslqi9.amplifyapp.com'
   ];
 
   const envOrigins = process.env.ALLOWED_ORIGINS
