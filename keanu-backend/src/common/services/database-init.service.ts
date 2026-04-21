@@ -54,11 +54,13 @@ export class DatabaseInitService {
       await this.runMigrationsIfNeeded();
 
       // Step 3: Check and run seeding if needed (skip in production)
-      if (process.env.NODE_ENV === 'production') {
-        this.logger.log('=== Skipping seeding in production environment.');
-      } else {
-        await this.seedIfNeeded();
-      }
+      // TODO: Temporarily disabled seeding - uncomment to re-enable
+      // if (process.env.NODE_ENV === 'production') {
+      //   this.logger.log('=== Skipping seeding in production environment.');
+      // } else {
+      //   await this.seedIfNeeded();
+      // }
+      this.logger.log('=== Seeding is temporarily disabled.');
 
       // this.logger.log('=== Database initialization completed successfully!');
       this.isInitialized = true;

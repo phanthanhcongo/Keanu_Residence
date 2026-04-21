@@ -21,6 +21,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "seed": "ts-node prisma/seeds/index.ts",
     "db:seed": "ts-node prisma/seeds/index.ts",
     "db:seed:stats": "ts-node prisma/seeds/seed-statistics-only.ts",
     "db:seed:user-manipulation": "ts-node prisma/seeds/user-manipulation.seed.ts",
