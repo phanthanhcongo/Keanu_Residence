@@ -10,19 +10,19 @@ const cookieParser = require('cookie-parser');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  var count = 0;
+
 
   // Trust proxy to get real client IP from headers (X-Forwarded-For, etc.)
   // Required when running behind Docker, nginx, Vercel, or other proxies
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.set('trust proxy', true);
 
-  // Initialize database before app starts (migrations, seeding)
+  // Initialize database before app starts (migrations, seeding - SEEDING TEMPORARILY DISABLED)
   // This ensures database is ready before any service tries to use it
   try {
     const databaseInitService = app.get(DatabaseInitService);
     await databaseInitService.onModuleInit();
-    count++;
+
   } catch (error) {
     console.error('Failed to initialize database:', error);
     process.exit(1);
@@ -109,7 +109,7 @@ async function bootstrap() {
 
 
 
-  console.log('Count:', count);
+
   // Global exception filter để format lỗi
   app.useGlobalFilters(new HttpExceptionFilter());
 

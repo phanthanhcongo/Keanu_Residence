@@ -2,14 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { PrismaClient } from '@prisma/client';
-import { seedProjects } from '../../../prisma/seeds/projects.seed';
-import { seedReservations } from '../../../prisma/seeds/reservations.seed';
-import { seedShortlists } from '../../../prisma/seeds/shortlists.seed';
-import { seedUnits } from '../../../prisma/seeds/units.seed';
-import { seedUsers } from '../../../prisma/seeds/users.seed';
-import { seedStatistics } from '../../../prisma/seeds/statistics.seed';
-import { seedUserManipulation } from '../../../prisma/seeds/user-manipulation.seed';
+
+// import { seedProjects } from '../../../prisma/seeds/projects.seed';
+// import { seedReservations } from '../../../prisma/seeds/reservations.seed';
+// import { seedShortlists } from '../../../prisma/seeds/shortlists.seed';
+// import { seedUnits } from '../../../prisma/seeds/units.seed';
+// import { seedUsers } from '../../../prisma/seeds/users.seed';
+// import { seedStatistics } from '../../../prisma/seeds/statistics.seed';
+// import { seedUserManipulation } from '../../../prisma/seeds/user-manipulation.seed';
 
 const execAsync = promisify(exec);
 
@@ -54,7 +54,6 @@ export class DatabaseInitService {
       await this.runMigrationsIfNeeded();
 
       // Step 3: Check and run seeding if needed (skip in production)
-      // TODO: Temporarily disabled seeding - uncomment to re-enable
       // if (process.env.NODE_ENV === 'production') {
       //   this.logger.log('=== Skipping seeding in production environment.');
       // } else {
@@ -336,6 +335,7 @@ export class DatabaseInitService {
   /**
    * Check if seed data exists and seed if needed (partial seeding support)
    */
+  /*
   private async seedIfNeeded(): Promise<void> {
     try {
       this.logger.log('=== Checking seed data status...');
@@ -372,9 +372,6 @@ export class DatabaseInitService {
     }
   }
 
-  /**
-   * Check if users exist
-   */
   private async checkUsersExist(): Promise<boolean> {
     try {
       const userCount = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
@@ -392,9 +389,6 @@ export class DatabaseInitService {
     }
   }
 
-  /**
-   * Check if projects exist
-   */
   private async checkProjectsExist(): Promise<boolean> {
     try {
       const projectCount = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
@@ -412,9 +406,6 @@ export class DatabaseInitService {
     }
   }
 
-  /**
-   * Check if units exist
-   */
   private async checkUnitsExist(): Promise<boolean> {
     try {
       const unitCount = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
@@ -432,9 +423,6 @@ export class DatabaseInitService {
     }
   }
 
-  /**
-   * Check if shortlists exist
-   */
   private async checkShortlistsExist(): Promise<boolean> {
     try {
       const shortlistCount = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
@@ -452,9 +440,6 @@ export class DatabaseInitService {
     }
   }
 
-  /**
-   * Check if statistics (activity logs) exist
-   */
   private async checkStatisticsExist(): Promise<boolean> {
     try {
       const statsCount = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
@@ -472,9 +457,6 @@ export class DatabaseInitService {
     }
   }
 
-  /**
-   * Check if user_manipulation records exist
-   */
   private async checkUserManipulationExist(): Promise<boolean> {
     try {
       const countResult = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
@@ -492,9 +474,6 @@ export class DatabaseInitService {
     }
   }
 
-  /**
-   * Run the seeding process (with partial seeding support)
-   */
   private async runSeeding(
     hasUsers: boolean,
     hasProjects: boolean,
@@ -503,79 +482,53 @@ export class DatabaseInitService {
     hasStatistics: boolean,
     hasUserManipulation: boolean,
   ): Promise<void> {
-    // Use a raw PrismaClient instance for seeding to avoid soft delete filters
     const prismaClient = new PrismaClient();
-
     try {
       let users: any[] = [];
       let projects: any[] = [];
       let units: any[] = [];
 
-      // Seed users if needed
       if (!hasUsers) {
         this.logger.log('  ... Seeding users...');
-        users = await seedUsers(prismaClient);
+        // users = await seedUsers(prismaClient);
       } else {
         this.logger.log('  ... Users already exist, skipping...');
-        // Fetch existing users for dependencies
         users = await prismaClient.user.findMany({ where: { isDeleted: false } });
       }
 
-      // Seed projects if needed
       if (!hasProjects) {
         this.logger.log('  ... Seeding projects...');
-        projects = await seedProjects(prismaClient);
+        // projects = await seedProjects(prismaClient);
       } else {
         this.logger.log('  ... Projects already exist, skipping...');
-        // Fetch existing projects for dependencies
         projects = await prismaClient.project.findMany({ where: { isDeleted: false } });
       }
 
-      // Seed units if needed (depends on projects)
       if (!hasUnits) {
         this.logger.log('  ... Seeding units...');
-        units = await seedUnits(prismaClient, projects);
+        // units = await seedUnits(prismaClient, projects);
       } else {
         this.logger.log('  ... Units already exist, skipping...');
-        // Fetch existing units for dependencies
         units = await prismaClient.unit.findMany({ where: { isDeleted: false } });
       }
 
-      // Seed shortlists if needed (depends on users and units)
       if (!hasShortlists) {
         this.logger.log('  ... Seeding shortlists...');
-        await seedShortlists(prismaClient, users, units);
-      } else {
-        this.logger.log('  ... Shortlists already exist, skipping...');
+        // await seedShortlists(prismaClient, users, units);
       }
 
-      // Seed reservations if needed (depends on users, units, projects)
-      // Currently commented out, but can be enabled if needed
-      // if (!hasReservations) {
-      //   this.logger.log('  ... Seeding reservations...');
-      //   await seedReservations(prismaClient, users, units, projects);
-      // }
-
-      // Seed statistics if needed (depends on users)
       if (!hasStatistics) {
         this.logger.log('  ... Seeding statistics...');
-        await seedStatistics(prismaClient, users);
-      } else {
-        this.logger.log('  ... Statistics already exist, skipping...');
+        // await seedStatistics(prismaClient, users);
       }
 
-      // Seed user manipulation (FOMO) if needed
       if (!hasUserManipulation) {
         this.logger.log('  ... Seeding user_manipulation...');
-        await seedUserManipulation(prismaClient);
-      } else {
-        this.logger.log('  ... user_manipulation already exists, skipping...');
+        // await seedUserManipulation(prismaClient);
       }
-
-      // this.logger.log('=== All required seed data created successfully');
     } finally {
       await prismaClient.$disconnect();
     }
   }
+  */
 }
-
