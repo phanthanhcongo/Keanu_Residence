@@ -4,6 +4,10 @@ import { seedStatistics } from './statistics.seed';
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ SEEDING DENIED: Database seeding is not allowed in production environment.');
+    process.exit(1);
+  }
   console.log('📊 Starting statistics data seeding...');
 
   try {

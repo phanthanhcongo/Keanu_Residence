@@ -52,6 +52,10 @@ export async function seedUserManipulation(prisma: PrismaClient = new PrismaClie
 
 // Allow standalone execution
 if (require.main === module) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ SEEDING DENIED: Database seeding is not allowed in production environment.');
+    process.exit(1);
+  }
   const prisma = new PrismaClient();
   seedUserManipulation(prisma)
     .catch((e) => {

@@ -53,8 +53,12 @@ export class DatabaseInitService {
       // Step 2: Check and run migrations if needed
       await this.runMigrationsIfNeeded();
 
-      // Step 3: Check and run seeding if needed
-      await this.seedIfNeeded();
+      // Step 3: Check and run seeding if needed (skip in production)
+      if (process.env.NODE_ENV === 'production') {
+        this.logger.log('=== Skipping seeding in production environment.');
+      } else {
+        await this.seedIfNeeded();
+      }
 
       // this.logger.log('=== Database initialization completed successfully!');
       this.isInitialized = true;
